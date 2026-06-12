@@ -44,7 +44,7 @@
         @endif
 
         @if($activeTab === 'response')
-            <livewire:pages.userpages.response.response :exam-id="request()->query('question_set')" />
+            <livewire:pages.userpages.response.response :question-set-id="request()->query('question_set')" />
         @endif
 
         @if($activeTab === 'timer')

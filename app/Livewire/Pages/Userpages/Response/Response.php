@@ -4,6 +4,7 @@ namespace App\Livewire\Pages\Userpages\Response;
 
 use Livewire\Component;
 use Livewire\WithPagination;
+use App\Models\Exam;
 use App\Models\ExamAttempt;
 use App\Models\Question;
 
@@ -13,19 +14,30 @@ class Response extends Component
 
     protected $paginationTheme = 'tailwind';
 
+    public $questionSetId;
     public $examId;
     public $selectedAttempt = [];
     public $showDeleteConfirm = false;
     public $attemptToDelete = null;
 
-    public function mount($examId = null)
+    public function mount($questionSetId = null)
     {
-        $this->examId = $examId;
+        $this->questionSetId = $questionSetId ?? request()->query('question_set');
+        $this->examId = $this->questionSetId
+            ? Exam::where('question_set_id', (int) $this->questionSetId)->value('id')
+            : null;
     }
 
     public function viewAttempt($attemptId)
     {
-        $attempt = ExamAttempt::with('answers.question')->find($attemptId);
+        if (! $this->examId) {
+            $this->selectedAttempt = [];
+            return;
+        }
+
+        $attempt = ExamAttempt::with('answers.question')
+            ->where('exam_id', $this->examId)
+            ->find($attemptId);
 
         if (! $attempt) {
             $this->selectedAttempt = [];
@@ -54,12 +66,25 @@ class Response extends Component
 
     public function deleteAttempt()
     {
-        if ($this->attemptToDelete) {
-            ExamAttempt::find($this->attemptToDelete)?->delete();
-            $this->showDeleteConfirm = false;
-            $this->attemptToDelete = null;
-            $this->dispatch('attempt-deleted', ['message' => 'Attempt deleted successfully']);
+        if (! $this->attemptToDelete) {
+            return;
         }
+
+        $attempt = ExamAttempt::where('id', $this->attemptToDelete)
+            ->when($this->examId, fn($query) => $query->where('exam_id', $this->examId))
+            ->first();
+
+        if ($attempt) {
+            $attempt->delete();
+        }
+
+        if (! empty($this->selectedAttempt) && isset($this->selectedAttempt['id']) && $this->selectedAttempt['id'] === $this->attemptToDelete) {
+            $this->selectedAttempt = [];
+        }
+
+        $this->showDeleteConfirm = false;
+        $this->attemptToDelete = null;
+        $this->dispatch('attempt-deleted', ['message' => 'Attempt deleted successfully']);
     }
 
     public function render()
